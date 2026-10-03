@@ -81,6 +81,28 @@ def is_authorized():
     return commands.check(predicate)
 
 
+def is_opencode_authorized():
+    """Allow OpenCode access without granting Discord admin commands."""
+
+    async def predicate(ctx: commands.Context) -> bool:
+        if ctx.guild is None:
+            return False
+        if os.getenv("OPENCODE_ALLOW_EVERYONE", "false").strip().lower() == "true":
+            return True
+        invited = {
+            int(item.strip())
+            for item in os.getenv("OPENCODE_USER_IDS", "").split(",")
+            if item.strip().isdigit()
+        }
+        if ctx.author.id in invited:
+            return True
+        if AUTHORIZED_USER_IDS:
+            return ctx.author.id in AUTHORIZED_USER_IDS
+        return ctx.author.id == ctx.guild.owner_id
+
+    return commands.check(predicate)
+
+
 def _normalize(value: str) -> str:
     return value.strip().lower()
 
@@ -753,7 +775,7 @@ async def unban_user(ctx: commands.Context, user_id: int, *, reason: str = "No r
 # Entrypoint
 # ---------------------------------------------------------------------------
 @bot.command(name="opencode", aliases=["oc", "ai"])
-@is_authorized()
+@is_opencode_authorized()
 @commands.max_concurrency(1, per=commands.BucketType.default, wait=False)
 async def opencode_prompt(ctx: commands.Context, *, prompt: str):
     """Ask OpenCode on the bot host. Usage: !oc explain this project"""
